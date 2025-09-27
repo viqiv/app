@@ -674,7 +674,6 @@ struct Extractor {
 #include <QThread>
 #include <QToolBar>
 #include <QVBoxLayout>
-#include <QtDBus/QtDBus>
 #include <iterator>
 
 struct DropBox : public QScrollArea {
@@ -1452,15 +1451,6 @@ struct App : public QApplication {
     return dir.toStdString();
   }
 };
-
-void dbus_dummy() {
-#ifdef __APPLE__
-  QDBusConnection bus = QDBusConnection::sessionBus();
-  if (!bus.isConnected()) {
-    qFatal("Cannot connect to the D-Bus session bus.");
-  }
-#endif
-}
 
 int main(int argc, char *argv[]) {
   qInitResources();
