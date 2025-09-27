@@ -29,4 +29,6 @@ jobs:
       run: |
         cmake --build build
         ls -a build
+        otool -l build/ZipCombiner
+        otool -L build/ZipCombiner
         
