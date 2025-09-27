@@ -1211,17 +1211,17 @@ struct App : public QApplication {
   bool canceled = false;
 
   App(int argc, char *argv[])
-      : QApplication(argc, argv), main_widget(&window), file_menu("File"),
+      : QApplication(argc, argv), file_menu("File"),
         action_file_open("Add"), action_extract("Extract"),
         action_license("About"), drop_box(&main_widget, &part_paths),
-        toolbar(&main_widget), file_dialog(&main_widget),
+        toolbar(&window), file_dialog(&main_widget),
         progress_window(&main_widget), exist_dialog(&main_widget),
         done_dialog(&main_widget), fail_dialog(&main_widget),
         about_menu("About", &window), about_window(&main_widget) {
-
+    window.resize(600, 400);
     window.setCentralWidget(&main_widget);
 
-    main_widget.resize(window.size());
+    //main_widget.resize(window.size());
     main_widget.setLayout(&main_layout);
     main_layout.addWidget(&drop_box);
 
@@ -1270,7 +1270,6 @@ struct App : public QApplication {
 
     window.addToolBar(&toolbar);
 
-    window.resize(600, 400);
     window.setWindowTitle("Zip Combiner");
     window.show();
 
