@@ -1,0 +1,39 @@
+name: ico=con
+
+on:
+  push:
+    paths:
+      - 'icons/logo.png'
+      - '.github/workflows/build-icon.yml'
+  workflow_dispatch:
+
+jobs:
+  build-icon:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Create
+      run: |
+        mkdir -p icons/Icon.iconset
+
+        sips -z 16 16     icons/logo.png --out icons/Icon.iconset/icon_16x16.png
+        sips -z 32 32     icons/logo.png --out icons/Icon.iconset/icon_16x16@2x.png
+        sips -z 32 32     icons/logo.png --out icons/Icon.iconset/icon_32x32.png
+        sips -z 64 64     icons/logo.png --out icons/Icon.iconset/icon_32x32@2x.png
+        sips -z 128 128   icons/logo.png --out icons/Icon.iconset/icon_128x128.png
+        sips -z 256 256   icons/logo.png --out icons/Icon.iconset/icon_128x128@2x.png
+        sips -z 256 256   icons/logo.png --out icons/Icon.iconset/icon_256x256.png
+        sips -z 512 512   icons/logo.png --out icons/Icon.iconset/icon_256x256@2x.png
+        sips -z 512 512   icons/logo.png --out icons/Icon.iconset/icon_512x512.png
+        cp icons/logo.png icons/Icon.iconset/icon_512x512@2x.png
+
+        iconutil -c icns icons/Icon.iconset -o icons/ZipCombiner.icns
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ZipCombiner.icns
+        path: icons/ZipCombiner.icns
