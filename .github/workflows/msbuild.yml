@@ -38,6 +38,7 @@ jobs:
       run: |
         /opt/homebrew/opt/qt/bin/macdeployqt build/ZipCombiner.app -verbose=3
         otool -L build/ZipCombiner.app/Contents/MacOS/ZipCombiner
+        ls -a build/ZipCombiner.app/Contents/Frameworks
         
 
         
