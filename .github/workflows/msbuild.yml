@@ -29,9 +29,18 @@ jobs:
       run: |
         cmake --build build
         ls -a build
-        otool -L build/ZipCombiner
+        otool -L build/ZipCombiner.app/Contents/MacOS/ZipCombiner
         otool -L /opt/homebrew/opt/qt/lib/QtCore.framework/Versions/A/QtCore
         otool -L /opt/homebrew/opt/qt/lib/QtGui.framework/Versions/A/QtGui
         otool -L /opt/homebrew/opt/qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+
+    - name: Deploy Qt frameworks into .app bundle
+      run: |
+        /opt/homebrew/opt/qt/bin/macdeployqt build/ZipCombiner.app -verbose=3
+        otool -L build/ZipCombiner.app/Contents/MacOS/ZipCombiner
+        ls -a build/ZipCombiner.app/Contents/Frameworks
+        ls -a build/ZipCombiner.app/Contents/PlugIns
+        
+
         
         
