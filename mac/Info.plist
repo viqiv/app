@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>ZipCombiner</string>
+	
+	<key>CFBundleDisplayName</key>
+	<string>ZipCombiner</string>
+	
+	<key>CFBundleIdentifier</key>
+	<string>com.yourcompany.zipcombiner</string>
+	
+	<key>CFBundleExecutable</key>
+	<string>ZipCombiner</string>
+	
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	
+	<key>CFBundleIconFile</key>
+	<string>ZipCombiner.icns</string>
+	
+	<key>LSMinimumSystemVersion</key>
+	<string>10.13</string>
+	
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to your Documents folder to open and save files.</string>
+
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>This app needs access to your Downloads folder to open ZIP files.</string>
+
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>This app needs access to your Desktop to select or save files.</string>
+</dict>
+</plist>
+

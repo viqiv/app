@@ -37,6 +37,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE minizip)
 
 
 if(APPLE)
+    set(MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/mac/Info.plist")
     set(APP_ICON icons/ZipCombiner.icns)
 
     set_source_files_properties(${APP_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
