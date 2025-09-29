@@ -1,3 +1,4 @@
+#include "qabstractbutton.h"
 #include "qapplication.h"
 #include "qglobal.h"
 #include <cassert>
@@ -11,7 +12,6 @@
 #include <mz.h>
 #include <mz_strm.h>
 
-#include <algorithm>
 #include <filesystem>
 #include <map>
 #include <mz_zip.h>
@@ -173,7 +173,7 @@ struct Mystream {
   off_t whole_offt;
   off_t whole_size;
 
-  Mystream(std::string *part_path) {
+  Mystream(std::list<std::string> *part_paths) {
     memset(&vtbl, 0, sizeof(vtbl));
 
     vtbl.open = my_stream_open_cb;
@@ -196,15 +196,16 @@ struct Mystream {
     off_t offt = 0;
     whole_size = 0;
 
-    // auto it = part_paths->begin();
+    auto it = part_paths->begin();
 
-    // for (size_t i = 0; i < part_paths->size(); i++) {
-    off_t new_offt = Part::init(&tmp, offt, part_path->c_str());
-    parts.push_back(tmp);
-    offt = new_offt;
-    whole_size += tmp.file_size;
-    // std::advance(it, 1);
-    // }
+    for (size_t i = 0; i < part_paths->size(); i++) {
+      off_t new_offt = Part::init(&tmp, offt, it->c_str());
+      printf("part: %s\n", it->c_str());
+      parts.push_back(tmp);
+      offt = new_offt;
+      whole_size += tmp.file_size;
+      std::advance(it, 1);
+    }
 
     whole_offt = 0;
   }
@@ -538,9 +539,9 @@ struct Extractor {
   Archive *archive;
   std::string dir_path;
   std::string zip_root;
-  std::string *zip;
+  std::string zip;
 
-  Extractor(Archive *a, std::string output_dir_path, std::string *zip_path) {
+  Extractor(Archive *a, std::string output_dir_path, std::string zip_path) {
     if (!std::filesystem::is_directory(output_dir_path)) {
       throw Extractor::Error("Output folder isn't valid.");
     }
@@ -613,7 +614,7 @@ struct Extractor {
     }
   }
 
-  void extract(void (*cb)(bool, bool, std::string *, void *),
+  void extract(void (*cb)(bool, bool, std::string, void *),
                bool (*excb)(const char *, size_t, bool, void *), void *ctx) {
     int res;
     bool first = true;
@@ -658,6 +659,7 @@ struct Extractor {
   void cancel() { archive->cancel = true; }
 };
 
+#include <QButtonGroup>
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDragEnterEvent>
@@ -669,6 +671,7 @@ struct Extractor {
 #include <QMessageBox>
 #include <QMimeData>
 #include <QProgressBar>
+#include <QRadioButton>
 #include <QScrollArea>
 #include <QTextBrowser>
 #include <QThread>
@@ -810,9 +813,32 @@ struct DropBox : public QScrollArea {
           layout.removeWidget(i);
           i->setParent(nullptr);
           i->deleteLater();
+          update();
+          repaint();
         }
       }
     }
+    if (part_paths->empty()) {
+      label.show();
+    }
+  }
+
+  void remove_all() {
+    auto child_list = container.children();
+    for (auto child : child_list) {
+      QWidget *w = qobject_cast<QWidget *>(child);
+      Item *i = reinterpret_cast<Item *>(w);
+      if (w != nullptr) {
+        part_paths->remove_if(
+            [i](std::string &s) { return !s.compare(i->get_name()); });
+        layout.removeWidget(i);
+        i->setParent(nullptr);
+        i->deleteLater();
+      }
+    }
+    update();
+    repaint();
+    label.show();
   }
 
   void redden_by_name(std::string target_name) {
@@ -836,11 +862,12 @@ struct ProgressWindow : public QDialog {
   QDialogButtonBox button_box;
   Extractor *x = nullptr;
   int pos;
-  std::string *file_name = nullptr;
+  std::string file_name;
 
   ProgressWindow(QWidget *parent)
       : QDialog(parent), layout(this), progress_bar(this), label(this),
         button_box(QDialogButtonBox::Cancel, this) {
+    file_name = "";
     layout.addWidget(&label);
     layout.addWidget(&progress_bar);
     setWindowTitle("Extracting");
@@ -857,12 +884,10 @@ struct ProgressWindow : public QDialog {
     }
   }
 
-  void setExtractor(Extractor *e, std::string *fname) {
+  void setExtractor(Extractor *e, std::string fname = "") {
     x = e;
     file_name = fname;
-    if (file_name) {
-      label.setText(QString::fromStdString(*file_name));
-    }
+    label.setText(QString::fromStdString(file_name));
   }
 
   void setRange(size_t low, size_t high) {
@@ -885,7 +910,7 @@ struct ProgressWindow : public QDialog {
     close();
     pos = progress_bar.maximum();
     label.setText("");
-    file_name = nullptr;
+    file_name = "";
   }
 
   void closeEvent(QCloseEvent *event) override {
@@ -1185,6 +1210,38 @@ struct FailDialog : public QMessageBox {
   }
 };
 
+struct ZipType : QDialog {
+  QVBoxLayout layout;
+  QButtonGroup grp;
+  QRadioButton splits;
+  QRadioButton fulls;
+  QDialogButtonBox button_box;
+  ZipType(QWidget *parent)
+      : QDialog(parent), grp(this), splits("Treat as parts of a single ZIP."),
+        fulls("Treat as full ZIP(s)."), button_box(QDialogButtonBox::Ok, this) {
+
+    grp.addButton(&splits);
+    grp.addButton(&fulls);
+
+    fulls.click();
+
+    layout.addWidget(&splits);
+    layout.addWidget(&fulls);
+    layout.addWidget(&button_box);
+
+    // button_box.button(QDialogButtonBox::Ok)->setText("");
+
+    setLayout(&layout);
+
+    ZipType::connect(&button_box, &QDialogButtonBox::accepted, this,
+                     &ZipType::go);
+  }
+
+  void go() { accept(); }
+
+  int ask() { return exec(); }
+};
+
 struct App : public QApplication {
   QMainWindow window;
   QWidget main_widget;
@@ -1202,6 +1259,7 @@ struct App : public QApplication {
   QVBoxLayout main_layout;
   QMenu about_menu;
   AboutWindow about_window;
+  ZipType zt;
 
   int errors = 0;
   int not_errors = 0;
@@ -1210,18 +1268,19 @@ struct App : public QApplication {
   bool canceled = false;
 
   App(int argc, char *argv[])
-      : QApplication(argc, argv), file_menu("File"),
-        action_file_open("Add"), action_extract("Extract"),
-        action_license("About"), drop_box(&main_widget, &part_paths),
-        toolbar(&window), file_dialog(&main_widget),
-        progress_window(&main_widget), exist_dialog(&main_widget),
-        done_dialog(&main_widget), fail_dialog(&main_widget),
-        about_menu("About", &window), about_window(&main_widget) {
+      : QApplication(argc, argv), file_menu("File"), action_file_open("Add"),
+        action_extract("Extract"), action_license("About"),
+        drop_box(&main_widget, &part_paths), toolbar(&window),
+        file_dialog(&main_widget), progress_window(&main_widget),
+        exist_dialog(&main_widget), done_dialog(&main_widget),
+        fail_dialog(&main_widget), about_menu("About", &window),
+        about_window(&main_widget), zt(&main_widget) {
     window.resize(600, 400);
     window.setCentralWidget(&main_widget);
 
-    //main_widget.resize(window.size());
+    // main_widget.resize(window.size());
     main_widget.setLayout(&main_layout);
+    // main_layout.addWidget(&zt);
     main_layout.addWidget(&drop_box);
 
     action_file_open.setIcon(QIcon(":/icons/icons/open.png"));
@@ -1249,10 +1308,11 @@ struct App : public QApplication {
     QMainWindow::connect(&action_extract, &QAction::triggered, [this]() {
       if (part_paths.empty())
         return;
+      zt.exec();
       std::string out_dir = open_out_dir();
       if (!out_dir.empty()) {
         printf(" len %lu\n", part_paths.size());
-        extract(this, out_dir);
+        extract(this, out_dir, zt.grp.checkedButton() == &zt.fulls);
       }
     });
 
@@ -1277,14 +1337,14 @@ struct App : public QApplication {
 
   void finishExtraction() {
     progress_window.finish();
-    progress_window.setExtractor(nullptr, nullptr);
+    progress_window.setExtractor(nullptr);
   }
 
-  void deleteZIP(const char *file_name, size_t file_name_len) {
+  void deleteZIP(std::string file_name) {
     not_errors += 1;
     if (!done_dialog.dontAsk()) {
       std::string qs("");
-      qs.append(file_name, file_name_len);
+      qs.append(file_name);
       qs.append(" extracted. Do you want to delete it?");
       if (done_dialog.ask(QString::fromStdString(qs)) == QMessageBox::Yes) {
         done_dialog.del = true;
@@ -1297,6 +1357,28 @@ struct App : public QApplication {
       try {
         std::filesystem::remove(file_name);
       } catch (std::exception &e) {
+      }
+    }
+  }
+
+  void deleteZIPSplits() {
+    not_errors += 1;
+    if (!done_dialog.dontAsk()) {
+      if (done_dialog.ask(
+              "Extraction complete. Do you want to delete the parts?") ==
+          QMessageBox::Yes) {
+        done_dialog.del = true;
+      } else {
+        done_dialog.del = false;
+      }
+    }
+
+    if (done_dialog.del) {
+      for (std::string &file_name : part_paths) {
+        try {
+          std::filesystem::remove(file_name);
+        } catch (std::exception &e) {
+        }
       }
     }
   }
@@ -1321,96 +1403,148 @@ struct App : public QApplication {
     canceled = done_dialog.del;
   }
 
-  static void extract(App *app, std::string od) {
+  void failSplits(const char *error_message) {
+    finishExtraction();
+    QMessageBox::warning(&main_widget, "Extraction failed", error_message);
+    errors = 0;
+    canceled = true;
+  }
+
+  void setupExtraction(Extractor *x, int num_entries, std::string file_name) {
+    QMetaObject::invokeMethod((QObject *)this,
+                              [this, x, num_entries, file_name]() {
+                                progress_window.setRange(0, num_entries);
+                                progress_window.myShow(
+                                    window.geometry().center());
+                                progress_window.setExtractor(x, file_name);
+                              },
+                              Qt::BlockingQueuedConnection);
+  }
+
+  static void extractCB(bool done, bool cancel, std::string zip, void *ctx) {
+    QMetaObject::invokeMethod((QObject *)ctx,
+                              [ctx, done, cancel, zip]() {
+                                App *a = (App *)ctx;
+                                a->canceled = cancel;
+                                a->progress_window.progress();
+                                if (done) {
+                                  a->finishExtraction();
+                                  if (!cancel) {
+                                    a->deleteZIP(zip);
+                                    a->drop_box.remove_by_name(zip);
+                                  }
+                                }
+                              },
+                              Qt::BlockingQueuedConnection);
+  }
+
+  static void extractSplitCB(bool done, bool cancel, std::string zip,
+                             void *ctx) {
+    QMetaObject::invokeMethod((QObject *)ctx,
+                              [ctx, done, cancel, zip]() {
+                                App *a = (App *)ctx;
+                                a->canceled = cancel;
+                                a->progress_window.progress();
+                                if (done) {
+                                  a->finishExtraction();
+                                  if (!cancel) {
+                                    a->deleteZIPSplits();
+                                    a->drop_box.remove_all();
+                                  }
+                                }
+                              },
+                              Qt::BlockingQueuedConnection);
+  }
+
+  static bool existsCB(const char *file_name, size_t file_name_len, bool is_dir,
+                       void *ctx) {
+    int skip;
+    QMetaObject::invokeMethod(
+        (QObject *)ctx,
+        [&skip, file_name, file_name_len, is_dir, ctx]() {
+          App *a = (App *)ctx;
+          if (a->exist_dialog.dontAsk()) {
+            skip = a->exist_dialog.overw ? QMessageBox::Yes : QMessageBox::No;
+            return;
+          }
+          std::string qs("");
+          if (is_dir) {
+            qs.append("Folder ");
+          } else {
+            qs.append("File ");
+          }
+          qs.append(file_name, file_name_len);
+          qs.append(" exists. Do you want to overwrite it?");
+          skip = a->exist_dialog.ask(QString::fromStdString(qs));
+          a->exist_dialog.overw = skip == QMessageBox::Yes;
+        },
+        Qt::BlockingQueuedConnection);
+    return skip == QMessageBox::Yes;
+  }
+
+  void extractFull(std::string part_name, std::string od) {
+    try {
+      std::list<std::string> p = {part_name};
+      Mystream z(&p);
+      Archive a(&z);
+      Extractor x(&a, od, part_name);
+      setupExtraction(&x, a.num_entries, part_name);
+      x.extract(extractCB, existsCB, this);
+    } catch (std::exception &e) {
+      QMetaObject::invokeMethod((QObject *)this,
+                                [this, &e, &part_name]() {
+                                  canceled = true;
+                                  fail(part_name, e.what());
+                                },
+                                Qt::BlockingQueuedConnection);
+    }
+  }
+
+  void extractSplits(std::list<std::string> *p, std::string od) {
+    try {
+      p->sort();
+      Mystream z(p);
+      Archive a(&z);
+      Extractor x(&a, od, "");
+      setupExtraction(&x, a.num_entries, "");
+      x.extract(extractSplitCB, existsCB, this);
+    } catch (std::exception &e) {
+      QMetaObject::invokeMethod((QObject *)this,
+                                [this, &e, p]() {
+                                  canceled = true;
+                                  failSplits(e.what());
+                                },
+                                Qt::BlockingQueuedConnection);
+    }
+  }
+
+  static void extract(App *app, std::string od, bool fulls) {
     app->fail_dialog.alwaysAsk();
     app->exist_dialog.alwaysAsk();
     app->done_dialog.alwaysAsk();
-    std::thread([app, od = std::move(od)]() {
-      auto part_paths_copy = app->part_paths;
-      for (auto parts_i : part_paths_copy) {
-        if (app->canceled)
-          break;
-        try {
-          Mystream z(&parts_i);
-          Archive a(&z);
-          Extractor x(&a, od, &parts_i);
-
+    std::thread([app, od = std::move(od), fulls]() {
+      if (fulls) {
+        auto part_paths_copy = app->part_paths;
+        for (auto parts_i : part_paths_copy) {
+          if (app->canceled)
+            break;
+          app->extractFull(parts_i, od);
+        }
+        if (!app->canceled) {
           QMetaObject::invokeMethod(
               (QObject *)app,
-              [&x, app, a = std::move(a), &parts_i]() {
-                app->progress_window.setRange(0, a.num_entries);
-                app->progress_window.myShow(app->window.geometry().center());
-                app->progress_window.setExtractor(&x, &parts_i);
+              [app]() {
+                App *a = (App *)app;
+                QMessageBox::information(
+                    &app->main_widget, "Done",
+                    QString::asprintf("Extraction completed with %d error(s).",
+                                      app->errors));
+                app->errors = 0;
               },
               Qt::BlockingQueuedConnection);
-
-          x.extract(
-              [](bool done, bool cancel, std::string *zip, void *ctx) {
-                QMetaObject::invokeMethod(
-                    (QObject *)ctx,
-                    [ctx, done, cancel, zip]() {
-                      App *a = (App *)ctx;
-                      a->canceled = cancel;
-                      a->progress_window.progress();
-                      if (done) {
-                        a->finishExtraction();
-                        assert(zip != nullptr);
-                        if (!cancel) {
-                          a->deleteZIP(zip->c_str(), zip->length());
-                          a->drop_box.remove_by_name(*zip);
-                        }
-                      }
-                    },
-                    Qt::BlockingQueuedConnection);
-              },
-              [](const char *file_name, size_t file_name_len, bool is_dir,
-                 void *ctx) {
-                int skip;
-                QMetaObject::invokeMethod(
-                    (QObject *)ctx,
-                    [&skip, file_name, file_name_len, is_dir, ctx]() {
-                      App *a = (App *)ctx;
-                      if (a->exist_dialog.dontAsk()) {
-                        skip = a->exist_dialog.overw ? QMessageBox::Yes
-                                                     : QMessageBox::No;
-                        return;
-                      }
-                      std::string qs("");
-                      if (is_dir) {
-                        qs.append("Folder ");
-                      } else {
-                        qs.append("File ");
-                      }
-                      qs.append(file_name, file_name_len);
-                      qs.append(" exists. Do you want to overwrite it?");
-                      skip = a->exist_dialog.ask(QString::fromStdString(qs));
-                      a->exist_dialog.overw = skip == QMessageBox::Yes;
-                    },
-                    Qt::BlockingQueuedConnection);
-                return skip == QMessageBox::Yes;
-              },
-              app);
-        } catch (std::exception &e) {
-          QMetaObject::invokeMethod((QObject *)app,
-                                    [app, &e, &parts_i]() {
-                                      app->canceled = true;
-                                      app->fail(parts_i, e.what());
-                                    },
-                                    Qt::BlockingQueuedConnection);
         }
-      }
-      if (!app->canceled) {
-        QMetaObject::invokeMethod(
-            (QObject *)app,
-            [app]() {
-              App *a = (App *)app;
-
-              QMessageBox::information(
-                  &a->main_widget, "Done",
-                  QString::asprintf("Extraction completed with %d error(s).",
-                                    a->errors));
-            },
-            Qt::BlockingQueuedConnection);
+      } else {
+        app->extractSplits(&app->part_paths, od);
       }
     }).detach();
   }
