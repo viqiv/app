@@ -679,6 +679,13 @@ struct Extractor {
 #include <QVBoxLayout>
 #include <iterator>
 
+#ifdef __APPLE__
+#include <QtDBus>
+bool dbusdummy() {
+  return QDBusConnection::sessionBus().isConnected();
+}
+#endif
+
 struct DropBox : public QScrollArea {
 
   struct Item : QWidget {

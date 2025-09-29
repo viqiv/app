@@ -37,6 +37,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE minizip)
 
 
 if(APPLE)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::DBus)
     set(MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/mac/Info.plist")
     set(APP_ICON icons/ZipCombiner.icns)
 
