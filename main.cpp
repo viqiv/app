@@ -681,9 +681,7 @@ struct Extractor {
 
 #ifdef __APPLE__
 #include <QtDBus>
-bool dbusdummy() {
-  return QDBusConnection::sessionBus().isConnected();
-}
+bool dbusdummy() { return QDBusConnection::sessionBus().isConnected(); }
 #endif
 
 struct DropBox : public QScrollArea {
@@ -758,7 +756,7 @@ struct DropBox : public QScrollArea {
     part_paths = parts;
     setAcceptDrops(true);
     back_layout.addWidget(&label);
-    label.setText("Drop you ZIP file sequence here");
+    label.setText("Drop your ZIP file sequence here");
     label.setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     label.setAlignment(Qt::AlignCenter);
     label.setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -980,13 +978,13 @@ struct LicenseDialog : public QDialog {
     }
   </style>
 </head>
-<body>
+<body style="background-color:#1e1e1e; color:#ffffff;">
   <h3>End User Licence Agreement (EULA)</h3>
 
   <div class="section">
     <p>
       This End User Licence Agreement (the "Agreement") governs the use of the software product
-      <strong>Zip Combiner</strong> (the "Software") provided by <strong>Studio Hanneman</strong> ("Vendor").
+      <strong>ZipCombiner</strong> (the "Software") provided by <strong>Studio Hanneman</strong> ("Vendor").
     </p>
     <p>
       By installing, copying, or otherwise using the Software, you ("Licensee") agree to be bound by
@@ -1126,7 +1124,7 @@ struct AboutWindow : public QDialog {
         p.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     label_logo.setFixedSize(50, 50);
 
-    label_name.setText("Zip Combiner");
+    label_name.setText("ZipCombiner");
     label_name.setStyleSheet("font-weight: bold;");
     label_version.setText("Version 1.3");
     label_copy.setText("Copyright 2025 Studio Hanneman");
@@ -1223,9 +1221,11 @@ struct ZipType : QDialog {
   QRadioButton splits;
   QRadioButton fulls;
   QDialogButtonBox button_box;
+  QCheckBox del;
   ZipType(QWidget *parent)
       : QDialog(parent), grp(this), splits("Treat as parts of a single ZIP."),
-        fulls("Treat as full ZIP(s)."), button_box(QDialogButtonBox::Ok, this) {
+        fulls("Treat as full ZIP(s)."), button_box(QDialogButtonBox::Ok, this),
+        del("Delete ZIP(s) after extraction.", this) {
 
     grp.addButton(&splits);
     grp.addButton(&fulls);
@@ -1234,6 +1234,7 @@ struct ZipType : QDialog {
 
     layout.addWidget(&splits);
     layout.addWidget(&fulls);
+    layout.addWidget(&del);
     layout.addWidget(&button_box);
 
     // button_box.button(QDialogButtonBox::Ok)->setText("");
@@ -1246,7 +1247,12 @@ struct ZipType : QDialog {
 
   void go() { accept(); }
 
-  int ask() { return exec(); }
+  int ask() {
+    del.setChecked(false);
+    return exec();
+  }
+
+  bool deleteAfter() { return del.isChecked(); }
 };
 
 struct App : public QApplication {
@@ -1261,7 +1267,7 @@ struct App : public QApplication {
   QFileDialog file_dialog;
   ProgressWindow progress_window;
   ExistDialog exist_dialog;
-  DoneDialog done_dialog;
+  // DoneDialog done_dialog;
   FailDialog fail_dialog;
   QVBoxLayout main_layout;
   QMenu about_menu;
@@ -1279,7 +1285,8 @@ struct App : public QApplication {
         action_extract("Extract"), action_license("About"),
         drop_box(&main_widget, &part_paths), toolbar(&window),
         file_dialog(&main_widget), progress_window(&main_widget),
-        exist_dialog(&main_widget), done_dialog(&main_widget),
+        exist_dialog(&main_widget),
+        // done_dialog(&main_widget),
         fail_dialog(&main_widget), about_menu("About", &window),
         about_window(&main_widget), zt(&main_widget) {
     window.resize(600, 400);
@@ -1336,7 +1343,7 @@ struct App : public QApplication {
 
     window.addToolBar(&toolbar);
 
-    window.setWindowTitle("Zip Combiner");
+    window.setWindowTitle("ZipCombiner");
     window.show();
 
     // qDebug("====== APP LAUNCHED =====\n");
@@ -1349,18 +1356,7 @@ struct App : public QApplication {
 
   void deleteZIP(std::string file_name) {
     not_errors += 1;
-    if (!done_dialog.dontAsk()) {
-      std::string qs("");
-      qs.append(file_name);
-      qs.append(" extracted. Do you want to delete it?");
-      if (done_dialog.ask(QString::fromStdString(qs)) == QMessageBox::Yes) {
-        done_dialog.del = true;
-      } else {
-        done_dialog.del = false;
-      }
-    }
-
-    if (done_dialog.del) {
+    if (zt.deleteAfter()) {
       try {
         std::filesystem::remove(file_name);
       } catch (std::exception &e) {
@@ -1370,17 +1366,7 @@ struct App : public QApplication {
 
   void deleteZIPSplits() {
     not_errors += 1;
-    if (!done_dialog.dontAsk()) {
-      if (done_dialog.ask(
-              "Extraction complete. Do you want to delete the parts?") ==
-          QMessageBox::Yes) {
-        done_dialog.del = true;
-      } else {
-        done_dialog.del = false;
-      }
-    }
-
-    if (done_dialog.del) {
+    if (zt.deleteAfter()) {
       for (std::string &file_name : part_paths) {
         try {
           std::filesystem::remove(file_name);
@@ -1407,7 +1393,7 @@ struct App : public QApplication {
     }
 
     drop_box.redden_by_name(zip_file_name);
-    canceled = done_dialog.del;
+    canceled = fail_dialog.del;
   }
 
   void failSplits(const char *error_message) {
@@ -1528,7 +1514,7 @@ struct App : public QApplication {
   static void extract(App *app, std::string od, bool fulls) {
     app->fail_dialog.alwaysAsk();
     app->exist_dialog.alwaysAsk();
-    app->done_dialog.alwaysAsk();
+    // app->done_dialog.alwaysAsk();
     std::thread([app, od = std::move(od), fulls]() {
       if (fulls) {
         auto part_paths_copy = app->part_paths;
@@ -1537,21 +1523,24 @@ struct App : public QApplication {
             break;
           app->extractFull(parts_i, od);
         }
-        if (!app->canceled) {
-          QMetaObject::invokeMethod(
-              (QObject *)app,
-              [app]() {
-                App *a = (App *)app;
-                QMessageBox::information(
-                    &app->main_widget, "Done",
-                    QString::asprintf("Extraction completed with %d error(s).",
-                                      app->errors));
-                app->errors = 0;
-              },
-              Qt::BlockingQueuedConnection);
-        }
       } else {
         app->extractSplits(&app->part_paths, od);
+      }
+      if (!app->canceled) {
+        QMetaObject::invokeMethod(
+            (QObject *)app,
+            [app]() {
+              App *a = (App *)app;
+              QString message = QString::asprintf(
+                  "Extraction completed with %d error(s).", app->errors);
+              if (a->errors == 0) {
+                QMessageBox::information(&app->main_widget, "Done", message);
+              } else {
+                QMessageBox::warning(&app->main_widget, "Done", message);
+              }
+              app->errors = 0;
+            },
+            Qt::BlockingQueuedConnection);
       }
     }).detach();
   }
