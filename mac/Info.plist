@@ -9,7 +9,7 @@
 	<string>ZipCombiner</string>
 	
 	<key>CFBundleIdentifier</key>
-	<string>com.yourcompany.zipcombiner</string>
+	<string>com.zipcombiner.zipcombine</string>
 	
 	<key>CFBundleExecutable</key>
 	<string>ZipCombiner</string>
