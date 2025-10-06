@@ -6,6 +6,6 @@ cmake --build .
 rm ZipCombiner.app/Contents/Info.plist
 cp ../mac/Info.plist ZipCombiner.app/Contents/
 macdeployqt ZipCombiner.app verbose=3 
-codesign --force --deep --sign - ZipCombiner.app
+#codesign --force --deep --sign - ZipCombiner.app
 cp -R ZipCombiner.app ~/Desktop
 
